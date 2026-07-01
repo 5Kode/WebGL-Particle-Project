@@ -1,0 +1,107 @@
+<script>
+    let audioContext, analyser, dataArray;
+    let isAudioInitialized = false;
+    let currentSoundSource = null; // Tracks the playing audio
+    window.currentAudioLowFreq = 0;
+
+    // Track beat detection states
+    let beatThreshold = 0.15;
+    let beatCutoff = 0;
+    let beatDecayRate = 0.98; 
+    let lastBeatTime = 0;
+
+    document.getElementById('audioFile').addEventListener('change', function(e) {
+        const files = e.target.files;
+        if (files.length === 0) return;
+        
+        // Stop any currently playing track before starting a new one
+        if (window.stopAudio) window.stopAudio();
+        
+        document.getElementById('uploadLabel').innerText = "Playing: " + files[0].name;
+        setupAudioProcessing(files[0]);
+    });
+
+    function setupAudioProcessing(file) {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 512;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+        }
+
+        const fileReader = new FileReader();
+        fileReader.onload = function(e) {
+            audioContext.decodeAudioData(e.target.result, function(buffer) {
+                currentSoundSource = audioContext.createBufferSource();
+                currentSoundSource.buffer = buffer;
+                currentSoundSource.connect(analyser);
+                analyser.connect(audioContext.destination);
+                currentSoundSource.start(0);
+                isAudioInitialized = true;
+            });
+        };
+        fileReader.readAsArrayBuffer(file);
+    }
+
+    // The kill switch function
+    window.stopAudio = function() {
+        if (currentSoundSource) {
+            currentSoundSource.stop();
+            currentSoundSource.disconnect();
+            currentSoundSource = null;
+        }
+        isAudioInitialized = false;
+        window.currentAudioLowFreq = 0; 
+        document.getElementById('uploadLabel').innerText = "Audio Stopped. Drop new MP3.";
+    };
+
+    // Pipeline Injection Hook: Modifies coordinates before LERP frame renders
+    window.processAudioReactivity = function(positions, count, time) {
+        if (!isAudioInitialized) return;
+
+        analyser.getByteFrequencyData(dataArray);
+
+        let lowFreqs = 0;  // Bass (Bins 0-10)
+        let highFreqs = 0; // Treble (Bins 150-200)
+
+        for (let i = 0; i < 10; i++) lowFreqs += dataArray[i];
+        for (let i = 150; i < 200; i++) highFreqs += dataArray[i];
+
+        lowFreqs = (lowFreqs / 10) / 255;
+        highFreqs = (highFreqs / 50) / 255;
+
+        window.currentAudioLowFreq = lowFreqs; // Share globally for particle sizing
+
+        // 1. Dynamic Shape Displacement Map
+        for (let i = 0; i < count; i++) {
+            positions[i * 3]     += Math.sin(i + time * 10) * (highFreqs * 8);
+            positions[i * 3 + 1] += Math.cos(i + time * 10) * (highFreqs * 8);
+            positions[i * 3 + 2] += Math.sin(i * 0.5 + time * 10) * (highFreqs * 8);
+
+            positions[i * 3]     *= 1.0 + (lowFreqs * 0.12);
+            positions[i * 3 + 1] *= 1.0 + (lowFreqs * 0.12);
+            positions[i * 3 + 2] *= 1.0 + (lowFreqs * 0.12);
+        }
+
+        // 2. Automated Geometric Layout Swapping on Beats
+        let instantEnergy = lowFreqs;
+        if (instantEnergy > beatCutoff && instantEnergy > beatThreshold) {
+            let currentTime = performance.now();
+            if (currentTime - lastBeatTime > 800) {
+                triggerAutomatedTopologySwap();
+                lastBeatTime = currentTime;
+            }
+            beatCutoff = instantEnergy * 1.1;
+        } else {
+            beatCutoff *= beatDecayRate;
+            if (beatCutoff < beatThreshold) beatCutoff = beatThreshold;
+        }
+    };
+
+    function triggerAutomatedTopologySwap() {
+        const modes = Object.keys(window.AnimationLibrary);
+        let currentIndex = modes.indexOf(activeMode);
+        let nextIndex = (currentIndex + 1) % modes.length;
+        switchMode(modes[nextIndex]);
+    }
+</script>

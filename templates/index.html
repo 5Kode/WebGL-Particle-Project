@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vortex - Audio Interactive Vector Space</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
     <style>
         body, html {
             margin: 0; padding: 0; overflow: hidden;
@@ -15,12 +16,21 @@
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
     </style>
 
-    <script>window.AnimationLibrary = {};</script>
-
-    <script src="/static/animations/cylinder.js"></script>
-    <script src="/static/animations/ocean.js"></script>
-    <script src="/static/animations/chaos.js"></script>
-    <script src="/static/animations/sphere.js"></script>
+    <script>
+        // Set up the global namespace immediately
+        window.AnimationLibrary = {};
+        
+        // Expose critical variables globally so component templates can access them safely
+        window.camera = null;
+        window.activeMode = '';
+        window.chromaActive = false;
+        window.switchMode = function(modeKey) {
+            window.activeMode = modeKey;
+            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+            const targetBtn = document.getElementById(`btn-${modeKey}`);
+            if(targetBtn) targetBtn.classList.add('active');
+        };
+    </script>
 </head>
 <body>
 
@@ -31,173 +41,220 @@
     {% include '_interactivity.html' %}
 
     <script>
-        let scene, camera, renderer, particleGeometry, particleSystem, particleMaterial;
-        const particleCount = 9000;
-        let activeMode = 'cylinder';
-        let clock = new THREE.Clock();
+        // Dynamically load animation scripts deterministically
+        async function loadAnimations() {
+            try {
+                const response = await fetch('/api/animations');
+                const data = await response.json();
+                
+                if (!data.animations || data.animations.length === 0) {
+                    console.warn("No animations returned from API.");
+                    initializeApp();
+                    return;
+                }
 
-        let targetPositions = new Float32Array(particleCount * 3);
-        let baseColors = new Float32Array(particleCount * 3);
-        let animationStates = {}; 
+                let loadedCount = 0;
+                const totalAnimations = data.animations.length;
 
-        // FX Modifiers Modulations
-        let chromaActive = false;
-        let chromaIntensity = 0.0;
+                // Create and append script tags for each animation with safety tracking
+                for (const anim of data.animations) {
+                    const script = document.createElement('script');
+                    script.src = `/static/animations/${anim.filename}`;
+                    
+                    script.onload = () => {
+                        loadedCount++;
+                        if (loadedCount === totalAnimations) {
+                            initializeApp(); // Fire only when everything is loaded
+                        }
+                    };
 
-        init();
-        animate();
+                    script.onerror = () => {
+                        console.error(`Failed to load script: ${anim.filename}`);
+                        loadedCount++;
+                        if (loadedCount === totalAnimations) {
+                            initializeApp();
+                        }
+                    };
 
-        function createCircleTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64; canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-            gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
-            gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.15)');
-            gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 64, 64);
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.needsUpdate = true;
-            return texture;
+                    document.head.appendChild(script);
+                }
+            } catch (error) {
+                console.error('Failed to fetch animation configuration:', error);
+                initializeApp();
+            }
         }
+        
+        function initializeApp() {
+            let scene, renderer, particleGeometry, particleSystem, particleMaterial;
+            const particleCount = 9000;
+            
+            // Set fallback mode if library populated successfully
+            window.activeMode = Object.keys(window.AnimationLibrary)[0] || 'cylinder';
+            let clock = new THREE.Clock();
 
-        function init() {
-            const container = document.getElementById('canvas-container');
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
-            camera.position.z = 130;
+            let targetPositions = new Float32Array(particleCount * 3);
+            let baseColors = new Float32Array(particleCount * 3);
+            let animationStates = {}; 
 
-            particleGeometry = new THREE.BufferGeometry();
-            let positions = new Float32Array(particleCount * 3);
-            let colors = new Float32Array(particleCount * 3);
+            let chromaIntensity = 0.0;
 
-            // Execute component safety configurations
-            for (let key in window.AnimationLibrary) {
-                if(window.AnimationLibrary[key].setup) {
-                    animationStates[key] = window.AnimationLibrary[key].setup(particleCount);
+            init();
+            animate();
+
+            function createCircleTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 64; canvas.height = 64;
+                const ctx = canvas.getContext('2d');
+                const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+                gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+                gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
+                gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.15)');
+                gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 64, 64);
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.needsUpdate = true;
+                return texture;
+            }
+
+            function init() {
+                const container = document.getElementById('canvas-container');
+                scene = new THREE.Scene();
+                
+                // Assign to window.camera so _interactivity.html can see it
+                window.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+                window.camera.position.z = 130;
+
+                particleGeometry = new THREE.BufferGeometry();
+                let positions = new Float32Array(particleCount * 3);
+                let colors = new Float32Array(particleCount * 3);
+
+                // Run setup safely across modules
+                for (let key in window.AnimationLibrary) {
+                    if(window.AnimationLibrary[key].setup) {
+                        animationStates[key] = window.AnimationLibrary[key].setup(particleCount);
+                    }
+                }
+
+                for (let i = 0; i < particleCount; i++) {
+                    positions[i*3] = (Math.random() - 0.5) * 200;
+                    positions[i*3+1] = (Math.random() - 0.5) * 200;
+                    positions[i*3+2] = (Math.random() - 0.5) * 200;
+
+                    if (Math.random() > 0.5) {
+                        baseColors[i*3] = 0.95; baseColors[i*3+1] = 0.65; baseColors[i*3+2] = 0.15;
+                    } else {
+                        baseColors[i*3] = 0.05; baseColors[i*3+1] = 0.80; baseColors[i*3+2] = 0.95;
+                    }
+                    colors[i*3] = baseColors[i*3];
+                    colors[i*3+1] = baseColors[i*3+1];
+                    colors[i*3+2] = baseColors[i*3+2];
+                }
+
+                particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                particleMaterial = new THREE.PointsMaterial({
+                    size: 1.4,
+                    map: createCircleTexture(),
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.75,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+
+                particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+                scene.add(particleSystem);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                container.appendChild(renderer.domElement);
+
+                buildUI();
+                window.addEventListener('resize', onWindowResize);
+            }
+
+            function buildUI() {
+                const controlsDiv = document.getElementById('controls');
+                controlsDiv.innerHTML = '';
+                for (let key in window.AnimationLibrary) {
+                    let btn = document.createElement('button');
+                    btn.className = `btn ${key === window.activeMode ? 'active' : ''}`;
+                    btn.id = `btn-${key}`;
+                    btn.innerText = window.AnimationLibrary[key].name;
+                    btn.onclick = () => window.switchMode(key);
+                    controlsDiv.appendChild(btn);
                 }
             }
 
-            for (let i = 0; i < particleCount; i++) {
-                positions[i*3] = (Math.random() - 0.5) * 200;
-                positions[i*3+1] = (Math.random() - 0.5) * 200;
-                positions[i*3+2] = (Math.random() - 0.5) * 200;
+            function animate() {
+                requestAnimationFrame(animate);
+                const time = clock.getElapsedTime();
 
-                if (Math.random() > 0.5) {
-                    baseColors[i*3] = 0.95; baseColors[i*3+1] = 0.65; baseColors[i*3+2] = 0.15;
-                } else {
-                    baseColors[i*3] = 0.05; baseColors[i*3+1] = 0.80; baseColors[i*3+2] = 0.95;
+                // 1. Calculate Core Mathematical Target Geometry
+                const currentModule = window.AnimationLibrary[window.activeMode];
+                if (currentModule) {
+                    const savedData = animationStates[window.activeMode];
+                    for (let i = 0; i < particleCount; i++) {
+                        let coords = currentModule.update(i, particleCount, time, savedData);
+                        if (coords) {
+                            targetPositions[i * 3] = coords.x;
+                            targetPositions[i * 3 + 1] = coords.y;
+                            targetPositions[i * 3 + 2] = coords.z;
+                        }
+                    }
                 }
-                colors[i*3] = baseColors[i*3];
-                colors[i*3+1] = baseColors[i*3+1];
-                colors[i*3+2] = baseColors[i*3+2];
-            }
 
-            particleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            particleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+                // 2. Modulate Targets via External Sub-Systems
+                if (window.processAudioReactivity) window.processAudioReactivity(targetPositions, particleCount, time);
+                if (window.processMousePhysics) window.processMousePhysics(targetPositions, particleCount);
 
-            particleMaterial = new THREE.PointsMaterial({
-                size: 1.4,
-                map: createCircleTexture(),
-                vertexColors: true,
-                transparent: true,
-                opacity: 0.75,
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
-            });
-
-            particleSystem = new THREE.Points(particleGeometry, particleMaterial);
-            scene.add(particleSystem);
-
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            container.appendChild(renderer.domElement);
-
-            buildUI();
-            window.addEventListener('resize', onWindowResize);
-        }
-
-        function buildUI() {
-            const controlsDiv = document.getElementById('controls');
-            controlsDiv.innerHTML = '';
-            for (let key in window.AnimationLibrary) {
-                let btn = document.createElement('button');
-                btn.className = `btn ${key === activeMode ? 'active' : ''}`;
-                btn.id = `btn-${key}`;
-                btn.innerText = window.AnimationLibrary[key].name;
-                btn.onclick = () => switchMode(key);
-                controlsDiv.appendChild(btn);
-            }
-        }
-
-        function switchMode(modeKey) {
-            activeMode = modeKey;
-            document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
-            const targetBtn = document.getElementById(`btn-${modeKey}`);
-            if(targetBtn) targetBtn.classList.add('active');
-        }
-
-        function animate() {
-            requestAnimationFrame(animate);
-            const time = clock.getElapsedTime();
-
-            // 1. Calculate Core Mathematical Target Geometry
-            const currentModule = window.AnimationLibrary[activeMode];
-            const savedData = animationStates[activeMode];
-            for (let i = 0; i < particleCount; i++) {
-                let coords = currentModule.update(i, particleCount, time, savedData);
-                targetPositions[i * 3] = coords.x;
-                targetPositions[i * 3 + 1] = coords.y;
-                targetPositions[i * 3 + 2] = coords.z;
-            }
-
-            // 2. Modulate Targets via External Sub-System Addons (Audio + Interaction)
-            if (window.processAudioReactivity) window.processAudioReactivity(targetPositions, particleCount, time);
-            if (window.processMousePhysics) window.processMousePhysics(targetPositions, particleCount);
-
-            // 3. Interpolation LERP Update Frame Execution Loop
-            const posAttr = particleGeometry.attributes.position;
-            const colorAttr = particleGeometry.attributes.color;
-            
-            for (let i = 0; i < posAttr.array.length; i++) {
-                posAttr.array[i] += (targetPositions[i] - posAttr.array[i]) * 0.08;
-            }
-
-            // 4. Chroma Spectral Fading Calculations
-            const targetChroma = chromaActive ? 1.0 : 0.0;
-            chromaIntensity += (targetChroma - chromaIntensity) * 0.05;
-            
-            let audioScale = window.currentAudioLowFreq ? window.currentAudioLowFreq * 2.5 : 0;
-            particleMaterial.size = 1.4 + (chromaIntensity * 1.5) + audioScale;
-
-            for (let i = 0; i < particleCount; i++) {
-                if (chromaIntensity > 0.001) {
-                    let hue = (i / particleCount * 360 + time * 45) % 360;
-                    let c = new THREE.Color(`hsl(${hue}, 100%, 60%)`);
-                    colorAttr.array[i * 3] = THREE.MathUtils.lerp(baseColors[i * 3], c.r, chromaIntensity);
-                    colorAttr.array[i * 3 + 1] = THREE.MathUtils.lerp(baseColors[i * 3 + 1], c.g, chromaIntensity);
-                    colorAttr.array[i * 3 + 2] = THREE.MathUtils.lerp(baseColors[i * 3 + 2], c.b, chromaIntensity);
-                } else {
-                    colorAttr.array[i * 3] = baseColors[i * 3];
-                    colorAttr.array[i * 3 + 1] = baseColors[i * 3 + 1];
-                    colorAttr.array[i * 3 + 2] = baseColors[i * 3 + 2];
+                // 3. Interpolation LERP Frame Update
+                const posAttr = particleGeometry.attributes.position;
+                const colorAttr = particleGeometry.attributes.color;
+                
+                for (let i = 0; i < posAttr.array.length; i++) {
+                    posAttr.array[i] += (targetPositions[i] - posAttr.array[i]) * 0.08;
                 }
+
+                // 4. Chroma Spectral Fading Calculations
+                const targetChroma = window.chromaActive ? 1.0 : 0.0;
+                chromaIntensity += (targetChroma - chromaIntensity) * 0.05;
+                
+                let audioScale = window.currentAudioLowFreq ? window.currentAudioLowFreq * 2.5 : 0;
+                particleMaterial.size = 1.4 + (chromaIntensity * 1.5) + audioScale;
+
+                for (let i = 0; i < particleCount; i++) {
+                    if (chromaIntensity > 0.001) {
+                        let hue = (i / particleCount * 360 + time * 45) % 360;
+                        let c = new THREE.Color(`hsl(${hue}, 100%, 60%)`);
+                        colorAttr.array[i * 3] = THREE.MathUtils.lerp(baseColors[i * 3], c.r, chromaIntensity);
+                        colorAttr.array[i * 3 + 1] = THREE.MathUtils.lerp(baseColors[i * 3 + 1], c.g, chromaIntensity);
+                        colorAttr.array[i * 3 + 2] = THREE.MathUtils.lerp(baseColors[i * 3 + 2], c.b, chromaIntensity);
+                    } else {
+                        colorAttr.array[i * 3] = baseColors[i * 3];
+                        colorAttr.array[i * 3 + 1] = baseColors[i * 3 + 1];
+                        colorAttr.array[i * 3 + 2] = baseColors[i * 3 + 2];
+                    }
+                }
+
+                posAttr.needsUpdate = true;
+                colorAttr.needsUpdate = true;
+                
+                particleSystem.rotation.y += 0.001;
+                renderer.render(scene, window.camera);
             }
 
-            posAttr.needsUpdate = true;
-            colorAttr.needsUpdate = true;
-            
-            particleSystem.rotation.y += 0.001;
-            renderer.render(scene, camera);
+            function onWindowResize() {
+                window.camera.aspect = window.innerWidth / window.innerHeight;
+                window.camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
         }
-
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+        
+        // Start loading animations cleanly on boot
+        window.addEventListener('DOMContentLoaded', loadAnimations);
     </script>
 </body>
 </html>

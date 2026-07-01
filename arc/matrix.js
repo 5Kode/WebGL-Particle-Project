@@ -1,5 +1,5 @@
 window.AnimationLibrary.matrix = {
-    name: "Cyber Grid",
+    name: "3D Martix",
     update: function(i, count, time) {
         // Calculate a 3D grid bounding box based on total particles
         let side = Math.ceil(Math.cbrt(count)); 

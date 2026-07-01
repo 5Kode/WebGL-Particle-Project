@@ -1,0 +1,28 @@
+/* Scrollable controls styling */
+#controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+/* Scrollbar styling for webkit browsers */
+#controls::-webkit-scrollbar {
+    width: 6px;
+}
+
+#controls::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+}
+
+#controls::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+}
+
+#controls::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

@@ -1,6 +1,6 @@
 // FIXED: Properly structured standalone plugin registration module
 window.AnimationLibrary.sphere = {
-    name: "Cosmic Lattice Sphere",
+    name: "Sphere",
     update: function(i, count, time) {
         // Fibonacci Golden Spiral distribution math for flawless global packaging
         let phi = Math.acos(-1 + (2 * i) / count);

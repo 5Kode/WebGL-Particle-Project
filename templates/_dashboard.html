@@ -53,25 +53,25 @@
 </style>
 
 <div class="dashboard">
-    <h2>VORTEX</h2>
-    <p>Engine Core v3.0 (Modular Components)</p>
+    <h2>WebGL Particles</h2>
+    <p>V1</p>
     
     <div class="section-label">Topologies</div>
     <div id="controls"></div>
     
-    <div class="section-label">Audio Synchronization</div>
+    <div class="section-label">Audio Sync</div>
     <div class="audio-input-wrapper">
         <span class="audio-label" id="uploadLabel">Drop or Select MP3 Track</span>
         <input type="file" id="audioFile" accept="audio/*">
     </div>
     
     <button class="btn" style="margin-top: 8px; width: 100%; text-align: center; background: rgba(220, 38, 38, 0.15); border-color: rgba(220, 38, 38, 0.3); color: #fca5a5;" onclick="if(window.stopAudio) window.stopAudio();">
-        ⏹️ Stop Music
+        Stop Music
     </button>
 
-    <div class="section-label">FX Modifiers</div>
+    <div class="section-label">FX</div>
     <div class="toggle-container" onclick="chromaActive = !chromaActive; document.getElementById('chromaToggle').checked = chromaActive;">
-        <span style="font-size: 13px; font-weight:600; color:rgba(255,255,255,0.8);">Chroma Spectral Glow</span>
+        <span style="font-size: 13px; font-weight:600; color:rgba(255,255,255,0.8);">Chroma</span>
         <label class="switch">
             <input type="checkbox" id="chromaToggle" onchange="event.stopPropagation(); chromaActive = this.checked;">
             <span class="slider"></span>

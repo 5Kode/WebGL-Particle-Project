@@ -1,51 +1,21 @@
-/**
- * VORTEX ENGINE - CUSTOM ANIMATION TEMPLATE
- * * How it works:
- * The engine calculates the X, Y, Z coordinates for every single particle, 60 times a second.
- * You are writing the mathematical rule for where ONE particle (index 'i') should be.
- */
-
-window.AnimationLibrary = window.AnimationLibrary || {};
-
 window.AnimationLibrary.myNewShape = {
-    // 1. The name that will appear automatically on the UI Dashboard button
-    name: "My Custom Shape",
-    
-    // 2. SETUP (Optional): Runs ONCE when the app loads.
-    // Use this to generate random seeds or heavy calculations so the app doesn't freeze.
-    // Whatever you return here is passed into the 'customData' variable in update().
-    setup: function(totalParticleCount) {
-        let mySavedData = [];
-        // Example: save a random speed for every particle
-        for(let i=0; i < totalParticleCount; i++) {
-            mySavedData.push( Math.random() * 2 );
+    name: "My New Shape", // Displays on the dashboard HUD
+    setup: function(count) {
+        // Optional: Run one-time calculations or generate coordinate seeds
+        let seeds = [];
+        for (let i = 0; i < count; i++) { 
+            seeds.push(Math.random()); 
         }
-        return mySavedData; 
+        return seeds;
     },
-
-    // 3. UPDATE (Required): Runs 60 frames per second FOR EVERY PARTICLE.
-    // Must be fast mathematical operations.
-    // 
-    // @param {number} i - The ID number of the current particle (e.g., 0 to 8999)
-    // @param {number} count - Total number of particles in the scene (e.g., 9000)
-    // @param {number} time - Runtime of the app in seconds (use this to make things move!)
-    // @param {any} customData - The data you returned from the setup() function above.
-    update: function(i, count, time, customData) {
-        
-        // --- YOUR MATH GOES HERE ---
-        // Example: A simple flat line that waves up and down
-        let x = (i / count) * 200 - 100; // Spread horizontally from -100 to 100
-        let z = 0; // Flat depth
-        
-        // Use the 'time' variable + Sine waves to create motion
-        let mySpeed = customData[i]; 
-        let y = Math.sin(time * mySpeed + x * 0.1) * 20;
-
-        // You MUST return an object with x, y, and z numbers!
+    update: function(i, count, time, seeds) {
+        // Required: Return individual x, y, z coordinate targets per frame
         return {
-            x: x,
-            y: y,
-            z: z
+            x: Math.sin(time + i) * 30,
+            y: (i / count) * 80 - 40,
+            z: Math.cos(time + i) * 30
         };
     }
 };
+
+# Creates an interesting winding cylindrical shape!

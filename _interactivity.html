@@ -1,0 +1,56 @@
+<script>
+    const mouse = { x: null, y: null, targetX: 0, targetY: 0 };
+    const raycaster = new THREE.Raycaster();
+    const planeIntersection = new THREE.Vector3();
+    const evaluationPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+
+    window.addEventListener('mousemove', function(e) {
+        // Normalize cursor positions (-1 to +1)
+        mouse.targetX = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.targetY = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    window.addEventListener('mouseleave', function() {
+        mouse.targetX = null; mouse.targetY = null;
+    });
+
+    window.processMousePhysics = function(positions, count) {
+        // Smoothly interpolate mouse positions to avoid sudden vector jumps
+        if (mouse.targetX === null) {
+            mouse.x = THREE.MathUtils.lerp(mouse.x, 0, 0.05);
+            mouse.y = THREE.MathUtils.lerp(mouse.y, 0, 0.05);
+            if(Math.abs(mouse.x) < 0.001) return; 
+        } else {
+            mouse.x = THREE.MathUtils.lerp(mouse.x, mouse.targetX, 0.1);
+            mouse.y = THREE.MathUtils.lerp(mouse.y, mouse.targetY, 0.1);
+        }
+
+        // Project cursor screen coordinates into 3D world space coordinates
+        raycaster.setFromCamera(new THREE.Vector2(mouse.x, mouse.y), camera);
+        raycaster.ray.intersectPlane(evaluationPlane, planeIntersection);
+
+        const forceRadius = 45; // Size of mouse repulsion bubble
+
+        for (let i = 0; i < count; i++) {
+            let pX = positions[i * 3];
+            let pY = positions[i * 3 + 1];
+            let pZ = positions[i * 3 + 2];
+
+            let dx = pX - planeIntersection.x;
+            let dy = pY - planeIntersection.y;
+            let dz = pZ - planeIntersection.z;
+            
+            let distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            if (distance < forceRadius) {
+                // Directional vector repulsion calculation
+                let force = (forceRadius - distance) / forceRadius;
+                let pushStrength = force * 28; // Tearing strength factor
+
+                positions[i * 3]     += (dx / distance) * pushStrength;
+                positions[i * 3 + 1] += (dy / distance) * pushStrength;
+                positions[i * 3 + 2] += (dz / distance) * pushStrength; // Pushes out in 3D depth space
+            }
+        }
+    };
+</script>

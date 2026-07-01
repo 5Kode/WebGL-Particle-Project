@@ -11,28 +11,7 @@ The application maps thousands of simultaneous points into complex, mathematical
   together. All you need to do to add more animations is drop the JavaScript file into static/animations and relaunch the Flask app. Everything will automatically 
   register and populate appropriately on the UI. 
 
-  Use the snippet below to build your own custom animation it allows you to attach a plugin definition directly onto the global window.AnimationLibrary 
-  object using this exact pattern:
-
-window.AnimationLibrary.myNewShape = {
-    name: "My New Shape", // Displays on the dashboard HUD
-    setup: function(count) {
-        // Optional: Run one-time calculations or generate coordinate seeds
-        let seeds = [];
-        for (let i = 0; i < count; i++) { seeds.push(Math.random()); }
-        return seeds;
-    },
-    update: function(i, count, time, seeds) {
-        // Required: Return individual x, y, z coordinate targets per frame
-        return {
-            x: Math.sin(time + i) * 30,
-            y: (i / count) * 80 - 40,
-            z: Math.cos(time + i) * 30
-        };
-    }
-};
-
-You can additionally use the .html file in the /guide folder.
+  Use the HTML file in /guides to view an example.
 
 To run my project, you must have Python 3.8 or higher and Flask installed via pip
 Then simply download the .zip or the top release, and run it from your terminal of choice in your chosen directory with: python app.py.
